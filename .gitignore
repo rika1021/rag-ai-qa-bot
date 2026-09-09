@@ -1,0 +1,17 @@
+# Environment
+.env
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Vector DB (generated, rebuild with main.py)
+chroma_db/
+
+# IDE
+.DS_Store
+.vscode/
+.idea/
