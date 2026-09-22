@@ -1,0 +1,86 @@
+[
+  {
+    "id": "shipping_001",
+    "domain": "shipping",
+    "question": "超商取貨的運費是多少？滿多少可以免運？",
+    "ground_truth_answer": "超商取貨每件運費為 NT$60，單筆訂單滿 NT$490 即可免運。",
+    "relevant_chunk_keywords": ["超商取貨", "NT$60", "NT$490", "免運"]
+  },
+  {
+    "id": "shipping_002",
+    "domain": "shipping",
+    "question": "外島地區可以用超商取貨嗎？",
+    "ground_truth_answer": "外島地區不支援超商取貨服務，只能使用黑貓宅配。",
+    "relevant_chunk_keywords": ["外島", "超商取貨", "不支援"]
+  },
+  {
+    "id": "shipping_003",
+    "domain": "shipping",
+    "question": "黑貓宅配連續幾次沒人收件之後，商品會被退回？",
+    "ground_truth_answer": "連續 3 次配送失敗，商品將退回倉庫，訂單自動取消並退款（扣除運費）。",
+    "relevant_chunk_keywords": ["3 次", "配送失敗", "退回倉庫"]
+  },
+  {
+    "id": "shipping_004",
+    "domain": "shipping",
+    "question": "金卡和鑽石會員訂單幾小時內會出貨？",
+    "ground_truth_answer": "金卡及鑽石會員享有優先出貨權益，下單後 4 小時內出貨。",
+    "relevant_chunk_keywords": ["金卡", "鑽石", "4 小時", "優先出貨"]
+  },
+  {
+    "id": "return_001",
+    "domain": "return",
+    "question": "收到商品後幾天內可以申請退貨？",
+    "ground_truth_answer": "自收到商品之日起算，必須於 7 個日曆天內提出退貨申請，超過 7 天恕不受理。",
+    "relevant_chunk_keywords": ["7 個日曆天", "退貨申請", "超過"]
+  },
+  {
+    "id": "return_002",
+    "domain": "return",
+    "question": "貼身衣物可以退貨嗎？",
+    "ground_truth_answer": "貼身衣物（內衣褲、泳裝、襪類）基於衛生安全考量，一經拆封即不接受退貨。",
+    "relevant_chunk_keywords": ["貼身衣物", "內衣褲", "一經拆封", "不接受退貨"]
+  },
+  {
+    "id": "return_003",
+    "domain": "return",
+    "question": "退款多久會入帳？會退到哪裡？",
+    "ground_truth_answer": "驗收通過後，退款將於 5～10 個工作天內退回至原付款方式。信用卡約 5～14 個工作天，LINE Pay / Apple Pay 約 3～7 個工作天，超商付款則退至樂購錢包。",
+    "relevant_chunk_keywords": ["5～10 個工作天", "原付款方式", "退款"]
+  },
+  {
+    "id": "return_004",
+    "domain": "return",
+    "question": "退貨審核通過後，幾天內要把商品寄出去？",
+    "ground_truth_answer": "審核通過後，請於收到通知後 7 天內完成寄件，逾期將視為放棄退貨。",
+    "relevant_chunk_keywords": ["7 天", "寄件", "逾期", "放棄退貨"]
+  },
+  {
+    "id": "member_001",
+    "domain": "membership",
+    "question": "鑽石會員每月可以領幾張免運券？",
+    "ground_truth_answer": "鑽石會員每月可獲得 5 張免運券。",
+    "relevant_chunk_keywords": ["鑽石", "5 張", "免運券"]
+  },
+  {
+    "id": "member_002",
+    "domain": "membership",
+    "question": "會員升等是什麼時候結算的？",
+    "ground_truth_answer": "系統每日凌晨 02:00 結算，當近 12 個月的累計消費金額達到門檻時，將於隔日自動升等。",
+    "relevant_chunk_keywords": ["每日凌晨 02:00", "自動升等", "12 個月"]
+  },
+  {
+    "id": "member_003",
+    "domain": "membership",
+    "question": "鑽石會員的退貨鑑賞期是幾天？一般會員呢？",
+    "ground_truth_answer": "鑽石會員享有 30 天鑑賞期，一般會員（銅卡、銀卡、金卡）為 7 天。",
+    "relevant_chunk_keywords": ["30 天", "鑑賞期", "鑽石", "7 天"]
+  },
+  {
+    "id": "payment_001",
+    "domain": "payment",
+    "question": "用 LINE Pay 付款，退款需要幾個工作天？",
+    "ground_truth_answer": "LINE Pay 退款約需 3～7 個工作天退回原支付帳戶。",
+    "relevant_chunk_keywords": ["LINE Pay", "3～7 個工作天", "退回"]
+  }
+]

@@ -1,0 +1,5 @@
+ragas==0.1.21
+langchain-anthropic>=0.1.0
+langchain-community>=0.2.0
+datasets>=2.20.0
+pytest>=8.0.0

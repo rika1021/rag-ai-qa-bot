@@ -1,0 +1,878 @@
+<title>RAG 架構筆記</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --bg: #ECF1F6; --surface: #FFFFFF; --surface-2: #E2EAF3; --border: #C6D3E0;
+  --text: #1C2B3A; --muted: #5C6E82; --accent: #007F74; --accent-lt: #D6F0EC;
+  --ing: #2563EB; --ing-bg: #EEF4FF; --ing-border: rgba(37,99,235,0.3);
+  --ret: #7C3AED; --ret-bg: #F3F0FF; --ret-border: rgba(124,58,237,0.3);
+  --gen: #047857; --gen-bg: #EDFAF5; --gen-border: rgba(4,120,87,0.3);
+  --api: #B45309; --api-bg: #FFFAEC; --api-border: rgba(180,83,9,0.3);
+  --code-bg: #182030; --code-text: #D0E4F4;
+  --code-kw: #BBA4FF; --code-str: #82CCEE; --code-cmt: #5A7A98; --code-fn: #7ECCFF; --code-num: #FFCF70;
+  --sidebar-w: 264px; --r: 6px;
+  --mono: 'IBM Plex Mono', 'Courier New', monospace;
+  --body: 'Inter', system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1520; --surface: #152030; --surface-2: #1C2D40; --border: #263A50;
+    --text: #D0E4F4; --muted: #6A8CAA; --accent: #00BFA8; --accent-lt: #082018;
+    --ing-bg: #101E38; --ret-bg: #18103A; --gen-bg: #0A2018; --api-bg: #201400;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D1520; --surface: #152030; --surface-2: #1C2D40; --border: #263A50;
+  --text: #D0E4F4; --muted: #6A8CAA; --accent: #00BFA8; --accent-lt: #082018;
+  --ing-bg: #101E38; --ret-bg: #18103A; --gen-bg: #0A2018; --api-bg: #201400;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);font-size:15px;line-height:1.7;color:var(--text);background:var(--bg);display:flex;min-height:100vh}
+
+/* SIDEBAR */
+#sidebar{width:var(--sidebar-w);flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--surface);border-right:1px solid var(--border);padding:24px 0;z-index:10}
+.sidebar-brand{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);padding:0 18px 18px;border-bottom:1px solid var(--border);margin-bottom:14px;letter-spacing:.04em}
+.sidebar-brand small{display:block;font-weight:400;color:var(--muted);font-size:11px;margin-top:3px}
+.nav-group{margin-bottom:6px}
+.nav-group-label{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 18px 3px;display:flex;align-items:center;gap:6px}
+.nav-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.d-ing{background:var(--ing)} .d-ret{background:var(--ret)} .d-gen{background:var(--gen)} .d-api{background:var(--api)}
+.nav-link{display:block;padding:4px 18px 4px 22px;font-size:12.5px;color:var(--muted);text-decoration:none;border-left:2px solid transparent;transition:all .15s;line-height:1.4}
+.nav-link:hover{color:var(--text);background:var(--surface-2)}
+.nav-link.active{color:var(--accent);border-left-color:var(--accent);background:var(--accent-lt);font-weight:500}
+
+/* MAIN */
+#main{flex:1;padding:0}
+.content-wrap{max-width:820px;margin:0 auto;padding:44px 40px 80px}
+.top-bar{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:36px;padding-bottom:24px;border-bottom:1px solid var(--border);gap:16px}
+.page-title{font-family:var(--mono);font-size:21px;font-weight:600;color:var(--text)}
+.page-sub{font-size:13px;color:var(--muted);margin-top:4px}
+.theme-btn{flex-shrink:0;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);padding:6px 12px;font-size:12px;color:var(--muted);cursor:pointer;font-family:var(--body);transition:background .15s}
+.theme-btn:hover{background:var(--border)}
+
+/* SECTION */
+.section{margin-bottom:60px;scroll-margin-top:24px}
+.section-header{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+.stage-badge{display:inline-block;padding:3px 9px;border-radius:4px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-family:var(--mono)}
+.b-ing{background:var(--ing-bg);color:var(--ing)} .b-ret{background:var(--ret-bg);color:var(--ret)}
+.b-gen{background:var(--gen-bg);color:var(--gen)} .b-api{background:var(--api-bg);color:var(--api)}
+h2{font-family:var(--mono);font-size:19px;font-weight:600;color:var(--text);text-wrap:balance}
+h3{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text);margin:28px 0 10px;text-wrap:balance}
+h4{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin:20px 0 7px}
+p{margin-bottom:10px;max-width:68ch;font-size:14px}
+.subsection{padding:24px 0;border-bottom:1px solid var(--border)}
+.subsection:last-child{border-bottom:none}
+
+/* CALLOUTS */
+.callout{border-radius:var(--r);padding:12px 16px;margin:14px 0;font-size:13.5px;line-height:1.6}
+.callout-label{font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:3px;opacity:.7}
+.callout-warn{background:#FFF7E0;border-left:3px solid #D97706;color:#7A4500}
+.callout-info{background:var(--accent-lt);border-left:3px solid var(--accent);color:var(--text)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .callout-warn{background:#281600;color:#FFCA80}}
+:root[data-theme="dark"] .callout-warn{background:#281600;color:#FFCA80}
+
+/* CODE */
+.code-block{background:var(--code-bg);border-radius:var(--r);margin:14px 0;overflow:hidden}
+.code-lang{padding:7px 14px;font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;color:var(--code-cmt);border-bottom:1px solid rgba(255,255,255,.06)}
+.code-block pre{padding:14px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--code-text)}
+code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);border:1px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--accent)}
+.kw{color:var(--code-kw)} .str{color:var(--code-str)} .cmt{color:var(--code-cmt);font-style:italic}
+.fn{color:var(--code-fn)} .num{color:var(--code-num)}
+
+/* TABLES */
+.table-wrap{overflow-x:auto;margin:14px 0}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 13px;font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--border);background:var(--surface-2)}
+td{padding:9px 13px;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.5}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--surface-2)}
+
+/* LISTS */
+ul,ol{padding-left:20px;margin:8px 0}
+li{margin-bottom:5px;font-size:14px;line-height:1.6}
+
+/* ═══ FLOW DIAGRAM A — RAG PIPELINE ═══ */
+.pipeline-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:28px 20px 20px;margin:28px 0}
+.diagram-hint{text-align:center;font-size:12px;color:var(--muted);margin-bottom:20px;font-style:italic}
+.pipeline-row{display:flex;align-items:center;gap:0}
+.p-node{flex:1;border:2px solid var(--border);border-radius:var(--r);padding:16px 12px;cursor:pointer;transition:all .2s;background:var(--bg);text-align:center;user-select:none}
+.p-node:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1)}
+.p-node.on-ing{border-color:var(--ing);background:var(--ing-bg)}
+.p-node.on-ret{border-color:var(--ret);background:var(--ret-bg)}
+.p-node.on-gen{border-color:var(--gen);background:var(--gen-bg)}
+.p-arrow{padding:0 8px;color:var(--muted);font-size:16px;flex-shrink:0}
+.p-node-name{font-family:var(--mono);font-size:13px;font-weight:600;margin-bottom:3px;color:var(--text)}
+.p-node.on-ing .p-node-name{color:var(--ing)}
+.p-node.on-ret .p-node-name{color:var(--ret)}
+.p-node.on-gen .p-node-name{color:var(--gen)}
+.p-node-sub{font-size:11px;color:var(--muted);line-height:1.3}
+.p-expanded{display:none;animation:slideDown .22s ease}
+.p-expanded.show{display:block}
+@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.p-steps{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:16px 4px 4px;justify-content:center}
+.p-step{padding:5px 13px;border-radius:16px;font-size:12px;font-weight:500;cursor:pointer;text-decoration:none;transition:all .15s;border:1px solid transparent}
+.ps-ing{background:var(--ing-bg);color:var(--ing);border-color:var(--ing-border)}
+.ps-ing:hover{background:var(--ing);color:#fff}
+.ps-ret{background:var(--ret-bg);color:var(--ret);border-color:var(--ret-border)}
+.ps-ret:hover{background:var(--ret);color:#fff}
+.ps-gen{background:var(--gen-bg);color:var(--gen);border-color:var(--gen-border)}
+.ps-gen:hover{background:var(--gen);color:#fff}
+.p-step-arrow{color:var(--muted);font-size:13px}
+
+/* ═══ FLOW DIAGRAM B — API SYSTEM ═══ */
+.system-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin:20px 0;overflow-x:auto}
+.system-grid{display:grid;grid-template-columns:160px 180px 200px;gap:12px;min-width:560px;align-items:start}
+.sys-panel{border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.sys-ph{padding:8px 12px;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.05em;border-bottom:1px solid var(--border)}
+.ph-fe{background:var(--ing-bg);color:var(--ing)}
+.ph-be{background:var(--ret-bg);color:var(--ret)}
+.ph-sv{background:var(--gen-bg);color:var(--gen)}
+.sys-ops{padding:8px;display:flex;flex-direction:column;gap:5px}
+.sys-op{padding:8px 10px;border-radius:4px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text);text-align:left;transition:all .15s;font-family:var(--body);line-height:1.3}
+.sys-op:hover,.sys-op.sel{background:var(--accent-lt);border-color:var(--accent);color:var(--accent)}
+.sys-be-inner{padding:8px;display:flex;flex-direction:column;gap:5px}
+.be-node{padding:7px 10px;border-radius:4px;font-size:11.5px;border:1px dashed var(--border);color:var(--muted);transition:all .3s;font-family:var(--mono);line-height:1.3}
+.be-node.lit-ing{border-style:solid;border-color:var(--ing);background:var(--ing-bg);color:var(--ing);font-weight:600}
+.be-node.lit-ret{border-style:solid;border-color:var(--ret);background:var(--ret-bg);color:var(--ret);font-weight:600}
+.be-node.lit-gen{border-style:solid;border-color:var(--gen);background:var(--gen-bg);color:var(--gen);font-weight:600}
+.be-node.lit-api{border-style:solid;border-color:var(--api);background:var(--api-bg);color:var(--api);font-weight:600}
+.sv-inner{padding:8px;display:flex;flex-direction:column;gap:5px}
+.sv-node{padding:8px 10px;border-radius:4px;font-size:11.5px;border:1px dashed var(--border);color:var(--muted);text-align:center;font-family:var(--mono);transition:all .3s}
+.sv-node.lit-chroma{border-style:solid;border-color:var(--ing);background:var(--ing-bg);color:var(--ing);font-weight:600}
+.sv-node.lit-claude{border-style:solid;border-color:var(--gen);background:var(--gen-bg);color:var(--gen);font-weight:600}
+.sys-info{margin-top:12px;padding:12px 14px;border-radius:var(--r);background:var(--surface-2);border:1px solid var(--border);font-size:13px;line-height:1.55;min-height:56px;color:var(--muted)}
+.sys-info.show{color:var(--text)}
+.sys-info strong{color:var(--accent)}
+
+/* MOBILE */
+.mobile-bar{display:none;position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);padding:11px 16px;align-items:center;justify-content:space-between}
+.hamburger{background:none;border:none;cursor:pointer;color:var(--text);font-size:20px;line-height:1}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:25}
+.overlay.show{display:block}
+@media(max-width:768px){
+  body{flex-direction:column}
+  #sidebar{position:fixed;left:-100%;top:0;height:100%;width:280px;transition:left .25s;z-index:30;box-shadow:4px 0 20px rgba(0,0,0,.2)}
+  #sidebar.open{left:0}
+  .mobile-bar{display:flex}
+  .content-wrap{padding:20px 16px 60px}
+  .pipeline-row{flex-direction:column}
+  .p-arrow{transform:rotate(90deg)}
+  .top-bar{flex-direction:column}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+
+<!-- Mobile top bar -->
+<div class="mobile-bar">
+  <button class="hamburger" onclick="toggleSidebar()" aria-label="開啟選單">☰</button>
+  <span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent)">RAG 架構筆記</span>
+  <button class="theme-btn" onclick="toggleTheme()">切換主題</button>
+</div>
+<div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+
+<!-- Sidebar -->
+<nav id="sidebar">
+  <div class="sidebar-brand">RAG 架構筆記<small>客服機器人 · side project</small></div>
+
+  <div class="nav-group">
+    <div class="nav-group-label">概覽</div>
+    <a class="nav-link" href="#overview">整體流程</a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label"><span class="nav-dot d-ing"></span>Ingestion</div>
+    <a class="nav-link" href="#ing-flow">流程順序</a>
+    <a class="nav-link" href="#ing-chunk">語意切割</a>
+    <a class="nav-link" href="#ing-recursive">RecursiveCharacterTextSplitter</a>
+    <a class="nav-link" href="#ing-embed">Embedding 模型</a>
+    <a class="nav-link" href="#ing-chroma">ChromaDB</a>
+    <a class="nav-link" href="#ing-schema">資料結構</a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label"><span class="nav-dot d-ret"></span>Retrieval</div>
+    <a class="nav-link" href="#ret-flow">流程總覽</a>
+    <a class="nav-link" href="#ret-same-model">同一個 Embedding 模型</a>
+    <a class="nav-link" href="#ret-hnsw">HNSW vs 暴力搜尋</a>
+    <a class="nav-link" href="#ret-distance">距離轉相似度</a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label"><span class="nav-dot d-gen"></span>Generator</div>
+    <a class="nav-link" href="#gen-early">found=False 提前返回</a>
+    <a class="nav-link" href="#gen-prompt">Prompt 組合</a>
+    <a class="nav-link" href="#gen-model">Claude Haiku</a>
+    <a class="nav-link" href="#gen-confidence">Confidence 機制</a>
+    <a class="nav-link" href="#gen-temp">Temperature 參數</a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label"><span class="nav-dot d-api"></span>API 溝通</div>
+    <a class="nav-link" href="#api-diagram">系統架構圖</a>
+    <a class="nav-link" href="#api-upload">POST /upload</a>
+    <a class="nav-link" href="#api-list">GET /documents</a>
+    <a class="nav-link" href="#api-delete">DELETE /{filename}</a>
+    <a class="nav-link" href="#api-chat">POST /chat</a>
+  </div>
+</nav>
+
+<!-- Main -->
+<main id="main">
+<div class="content-wrap">
+
+  <div class="top-bar">
+    <div>
+      <div class="page-title">RAG 架構筆記</div>
+      <div class="page-sub">RAG-based 客服機器人 · Ingestion → Retrieval → Generator</div>
+    </div>
+    <button class="theme-btn" onclick="toggleTheme()">切換主題</button>
+  </div>
+
+  <!-- ══ SECTION 0: OVERVIEW ══ -->
+  <section class="section" id="overview">
+    <div class="section-header">
+      <h2>整體 RAG 流程</h2>
+    </div>
+
+    <p>這個系統是一個 RAG（Retrieval-Augmented Generation）客服機器人。使用者上傳客服文件後，系統將文件向量化存入資料庫；使用者提問時，系統找出最相關的片段，組合 prompt 交給 Claude 生成回答。</p>
+
+    <div class="pipeline-wrap">
+      <div class="diagram-hint">點擊各階段展開子步驟，點擊子步驟跳至詳細說明 ↓</div>
+      <div class="pipeline-row">
+        <div class="p-node" id="pn-ing" onclick="togglePipeline('ing')">
+          <div class="p-node-name">Ingestion</div>
+          <div class="p-node-sub">文件上傳 &amp; 向量化</div>
+        </div>
+        <div class="p-arrow">→</div>
+        <div class="p-node" id="pn-ret" onclick="togglePipeline('ret')">
+          <div class="p-node-name">Retrieval</div>
+          <div class="p-node-sub">語意搜尋 &amp; 過濾</div>
+        </div>
+        <div class="p-arrow">→</div>
+        <div class="p-node" id="pn-gen" onclick="togglePipeline('gen')">
+          <div class="p-node-name">Generator</div>
+          <div class="p-node-sub">組合 prompt &amp; 生成</div>
+        </div>
+      </div>
+
+      <div class="p-expanded" id="pe-ing">
+        <div class="p-steps">
+          <a class="p-step ps-ing" href="#ing-flow">載入文件</a>
+          <span class="p-step-arrow">→</span>
+          <a class="p-step ps-ing" href="#ing-chunk">語意切割</a>
+          <span class="p-step-arrow">→</span>
+          <a class="p-step ps-ing" href="#ing-embed">Embedding</a>
+          <span class="p-step-arrow">→</span>
+          <a class="p-step ps-ing" href="#ing-chroma">寫入 ChromaDB</a>
+        </div>
+      </div>
+
+      <div class="p-expanded" id="pe-ret">
+        <div class="p-steps">
+          <a class="p-step ps-ret" href="#ret-flow">問題 Embedding</a>
+          <span class="p-step-arrow">→</span>
+          <a class="p-step ps-ret" href="#ret-hnsw">HNSW 查詢</a>
+          <span class="p-step-arrow">→</span>
+          <a class="p-step ps-ret" href="#ret-distance">相似度過濾</a>
+        </div>
+      </div>
+
+      <div class="p-expanded" id="pe-gen">
+        <div class="p-steps">
+          <a class="p-step ps-gen" href="#gen-early">found 判斷</a>
+          <span class="p-step-arrow">→</span>
+          <a class="p-step ps-gen" href="#gen-prompt">組合 Prompt</a>
+          <span class="p-step-arrow">→</span>
+          <a class="p-step ps-gen" href="#gen-model">Claude 生成</a>
+          <span class="p-step-arrow">→</span>
+          <a class="p-step ps-gen" href="#gen-confidence">回傳 Confidence</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ SECTION 1: INGESTION ══ -->
+  <section class="section" id="ingestion">
+    <div class="section-header">
+      <span class="stage-badge b-ing">Ingestion</span>
+      <h2>文件上傳與向量化</h2>
+    </div>
+
+    <div class="subsection" id="ing-flow">
+      <h3>流程順序與常見誤解</h3>
+      <p>正確順序：</p>
+      <div class="code-block"><div class="code-lang">PIPELINE</div><pre>文件上傳 → Chunking → Embedding → 寫入 ChromaDB（資料庫自動建索引）</pre></div>
+      <div class="callout callout-warn">
+        <div class="callout-label">常見誤解</div>
+        「索引」不是獨立步驟，是 ChromaDB 在呼叫 <code>collection.add()</code> 時自動在內部建立的，不需要手動觸發。
+      </div>
+    </div>
+
+    <div class="subsection" id="ing-chunk">
+      <h3>語意切割 — <code>_semantic_chunk()</code></h3>
+      <p>程式碼位置：<code>app/core/rag/ingestion.py:18</code></p>
+      <p>與傳統字數切割的根本差異：字數切割不管內容，切到字數上限就截斷；語意切割以原文的段落結構為主要依據，字數只是兜底。</p>
+
+      <h4>兩段式邏輯</h4>
+      <div class="code-block"><div class="code-lang">Python — ingestion.py</div><pre><span class="kw">def</span> <span class="fn">_semantic_chunk</span>(text: <span class="fn">str</span>) -> <span class="fn">list</span>[<span class="fn">str</span>]:
+    max_size = <span class="num">500</span>   <span class="cmt"># chunk_size</span>
+    min_paragraph = <span class="num">80</span>
+
+    <span class="cmt"># 第一段：按空行切段落（尊重原作者的語意邊界）</span>
+    raw_paragraphs = [p.strip() <span class="kw">for</span> p <span class="kw">in</span> text.split(<span class="str">"\n\n"</span>) <span class="kw">if</span> p.strip()]
+
+    <span class="cmt"># 第二段：合併太短的段落，保留適中的段落</span>
+    <span class="kw">for</span> para <span class="kw">in</span> raw_paragraphs:
+        <span class="kw">if</span> len(buffer) < min_paragraph <span class="kw">and</span> ...:
+            buffer = buffer + <span class="str">"\n\n"</span> + para  <span class="cmt"># 合併太短（< 80字）</span>
+        ...
+
+    <span class="cmt"># 太長（> 500字）交給 RecursiveCharacterTextSplitter 細切</span>
+    <span class="kw">if</span> len(para) > max_size:
+        final_chunks.extend(splitter.split_text(para))</pre></div>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>情況</th><th>處理方式</th></tr></thead>
+        <tbody>
+          <tr><td>段落 &lt; 80 字</td><td>合併到下一個段落，避免資訊量太少</td></tr>
+          <tr><td>段落 80~500 字</td><td>直接保留，不再處理</td></tr>
+          <tr><td>段落 &gt; 500 字</td><td>交給 RecursiveCharacterTextSplitter 細切</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="subsection" id="ing-recursive">
+      <h3>RecursiveCharacterTextSplitter 的運作方式</h3>
+      <p>「Recursive（遞迴）」是關鍵字。它有一個<strong>優先順序分隔符號清單</strong>，依序嘗試：</p>
+      <div class="code-block"><div class="code-lang">分隔符號優先順序</div><pre>[<span class="str">"\n\n"</span>, <span class="str">"\n"</span>, <span class="str">"。"</span>, <span class="str">"！"</span>, <span class="str">"？"</span>, <span class="str">" "</span>, <span class="str">""</span>]</pre></div>
+      <p>運作邏輯：先試能不能在空行切？可以就切。不行，退而求其次在換行切。還是不行，在句號切。最後實在沒辦法，才硬切字元。</p>
+      <div class="callout callout-info">
+        <div class="callout-label">chunk_overlap=50 的作用</div>
+        每個 chunk 的結尾與下一個 chunk 的開頭<strong>重疊 50 個字</strong>，避免跨 chunk 邊界的語意被硬切斷，讓內容在邊界處保有連貫性。
+      </div>
+    </div>
+
+    <div class="subsection" id="ing-embed">
+      <h3>Embedding 模型</h3>
+      <p>使用模型：<code>sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2</code></p>
+      <p>工具套件：<code>fastembed</code>（本地執行，不需要網路）</p>
+      <p><strong>淺白說明：</strong>把文字翻譯成 384 個數字組成的座標。語意相近的兩段文字，在這個 384 維空間裡的點距離很近；語意無關的文字距離很遠。查詢時用數學計算（cosine 相似度）找出最相關的 chunk。</p>
+
+      <h4>模型名稱拆解</h4>
+      <div class="table-wrap"><table>
+        <thead><tr><th>部分</th><th>意思</th></tr></thead>
+        <tbody>
+          <tr><td><code>sentence-transformers</code></td><td>專門把句子轉成向量的框架</td></tr>
+          <tr><td><code>paraphrase</code></td><td>訓練時用「同義改寫句對」學習，相同意思但不同說法的句子向量靠近</td></tr>
+          <tr><td><code>multilingual</code></td><td>支援 50+ 語言，中英文同一個意思，向量也會很接近</td></tr>
+          <tr><td><code>MiniLM</code></td><td>Microsoft 開發的輕量架構，大模型「蒸餾」成小模型，速度快但效果接近</td></tr>
+          <tr><td><code>L12</code></td><td>有 12 層神經網路</td></tr>
+          <tr><td><code>v2</code></td><td>第二版</td></tr>
+        </tbody>
+      </table></div>
+
+      <h4>與其他模型比較</h4>
+      <div class="table-wrap"><table>
+        <thead><tr><th>比較對象</th><th>差異</th></tr></thead>
+        <tbody>
+          <tr><td>OpenAI text-embedding-3-small</td><td>需付費打 API、需要網路；本模型完全本地，免費</td></tr>
+          <tr><td>all-MiniLM-L6-v2（英文版）</td><td>只擅長英文；本模型支援中文</td></tr>
+          <tr><td>更大的模型（L24、L32）</td><td>向量品質稍高但慢很多、佔記憶體多；文件量小的專案 L12 足夠</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="subsection" id="ing-chroma">
+      <h3>ChromaDB — 向量資料庫</h3>
+      <h4>普通資料庫 vs 向量資料庫</h4>
+      <div class="table-wrap"><table>
+        <thead><tr><th></th><th>普通資料庫（MySQL）</th><th>向量資料庫（ChromaDB）</th></tr></thead>
+        <tbody>
+          <tr><td>搜尋問題</td><td>「哪筆欄位<em>等於</em>某個值？」</td><td>「哪幾筆向量和查詢向量<em>最接近</em>？」</td></tr>
+          <tr><td>搜尋方式</td><td>精確比對</td><td>近似最近鄰搜尋（ANN）</td></tr>
+        </tbody>
+      </table></div>
+      <p>MySQL 做不到向量近似搜尋，因為沒辦法有效率地在幾千個 384 維向量裡找「最接近的」。</p>
+
+      <h4>ChromaDB 在本專案的儲存方式</h4>
+      <div class="code-block"><div class="code-lang">Python — vectorstore.py:17</div><pre>chromadb.<span class="fn">PersistentClient</span>(path=<span class="fn">str</span>(settings.chroma_dir))</pre></div>
+      <p><code>PersistentClient</code> 代表資料直接存成<strong>本機的資料夾和檔案</strong>（SQLite + 二進位檔）。<code>collection.add()</code> 是直接寫檔，<code>collection.query()</code> 是直接讀檔，<strong>完全不走網路</strong>。</p>
+
+      <h4>HNSW 索引</h4>
+      <p>程式碼設定 <code>"hnsw:space": "cosine"</code>，表示使用 cosine 距離的 HNSW 圖索引。在你 <code>add()</code> 資料時，ChromaDB 自動建立這個圖結構，讓後續查詢不需要全部比對。（詳見 Retrieval 階段的說明）</p>
+
+      <h4>為什麼選 ChromaDB</h4>
+      <div class="table-wrap"><table>
+        <thead><tr><th>選項</th><th>適合場景</th></tr></thead>
+        <tbody>
+          <tr><td><strong>ChromaDB（本專案）</strong></td><td>本地開發、side project、快速上手，零設定</td></tr>
+          <tr><td>Pinecone</td><td>雲端、大規模生產環境，需付費</td></tr>
+          <tr><td>Weaviate / Qdrant</td><td>需要 Docker 或 Server，設定複雜，適合團隊協作</td></tr>
+          <tr><td>pgvector</td><td>已有 PostgreSQL 系統想順便加向量搜尋</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="subsection" id="ing-schema">
+      <h3>寫入向量資料庫的資料結構</h3>
+      <p>每一筆資料（每個 chunk）由四個欄位組成，對應 <code>ingestion.py:73</code> 的 <code>collection.add()</code>：</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>欄位</th><th>型態</th><th>內容範例</th></tr></thead>
+        <tbody>
+          <tr><td><code>ids</code></td><td>string</td><td><code>付款方式說明.pdf_chunk_0</code></td></tr>
+          <tr><td><code>documents</code></td><td>string</td><td>chunk 的原始文字</td></tr>
+          <tr><td><code>embeddings</code></td><td>list[float]</td><td><code>[0.023, -0.15, ...]</code> 共 384 個數字</td></tr>
+          <tr><td><code>metadatas</code></td><td>dict</td><td><code>{"source": "付款方式說明.pdf", "chunk_index": 0}</code></td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout callout-info">
+        <div class="callout-label">重點</div>
+        <strong>原文和向量都存進去</strong>。查詢時用向量找最相關的 chunk，找到後把原文傳給 LLM 生成答案。
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ SECTION 2: RETRIEVAL ══ -->
+  <section class="section" id="retrieval">
+    <div class="section-header">
+      <span class="stage-badge b-ret">Retrieval</span>
+      <h2>語意搜尋與過濾</h2>
+    </div>
+
+    <div class="subsection" id="ret-flow">
+      <h3>流程總覽與常見誤解糾正</h3>
+      <div class="code-block"><div class="code-lang">FLOW</div><pre>使用者問題
+  → embed()（與 Ingestion 同一個模型）
+  → 查詢向量
+  → collection.query()（HNSW，不是全比對）
+  → 取前 5 個最近鄰 + 它們的距離
+  → similarity = 1 - distance，過濾 &lt; 0.3 的
+  → 剩下的 chunk（0~5 個）
+  → 組合 prompt 給 Claude</pre></div>
+
+      <div class="callout callout-warn">
+        <div class="callout-label">常見誤解</div>
+        <strong>不是同時做</strong>「取出相似度 &gt; 0.3 的前 5 個」，而是兩步：<br>
+        1. 先取前 5 個最相似的（不管分數）<br>
+        2. 再用 0.3 門檻過濾，分數不夠的丟掉<br><br>
+        最終可能是 5、3、1 個，甚至 0 個。0 個時直接回覆拒答字串，不呼叫 Claude。
+      </div>
+
+      <div class="code-block"><div class="code-lang">Python — retrieval.py</div><pre><span class="cmt"># 步驟一：先取 top 5（不管分數）</span>
+results = collection.<span class="fn">query</span>(
+    query_embeddings=[query_embedding],
+    n_results=settings.retrieval_top_k,  <span class="cmt"># = 5</span>
+    include=[<span class="str">"documents"</span>, <span class="str">"metadatas"</span>, <span class="str">"distances"</span>],
+)
+
+<span class="cmt"># 步驟二：過濾相似度 &lt; 0.3 的</span>
+<span class="kw">for</span> doc, meta, distance <span class="kw">in</span> zip(documents, metadatas, distances):
+    similarity = <span class="num">1</span> - distance
+    <span class="kw">if</span> similarity >= settings.similarity_threshold:  <span class="cmt"># 0.3</span>
+        filtered_chunks.append(doc)</pre></div>
+    </div>
+
+    <div class="subsection" id="ret-same-model">
+      <h3>為什麼必須用同一個 Embedding 模型</h3>
+      <p>Retrieval 階段呼叫的是完全相同的 <code>embed()</code> 函式（來自 <code>vectorstore.py</code>），使用同一個模型 <code>paraphrase-multilingual-MiniLM-L12-v2</code>。</p>
+      <div class="callout callout-info">
+        <div class="callout-label">原因</div>
+        不同模型產生的向量，座標系統不同，比出來的距離毫無意義。就像台灣用 TWD97 座標系、歐洲用 WGS84，直接比數字不能代表真實距離。存進去用什麼模型轉，查詢時就必須用同一個模型轉。
+      </div>
+    </div>
+
+    <div class="subsection" id="ret-hnsw">
+      <h3>HNSW vs 暴力搜尋</h3>
+      <h4>暴力做法（Brute Force）</h4>
+      <div class="code-block"><div class="code-lang">CONCEPT</div><pre>查詢向量 → 跟第1筆比 → 跟第2筆比 → ... → 跟第N筆比 → 取最近
+複雜度：O(N)　資料越多越慢</pre></div>
+
+      <h4>HNSW 的做法</h4>
+      <p>在 <code>add()</code> 時預先把所有向量建成多層圖結構：</p>
+      <div class="code-block"><div class="code-lang">HNSW 圖結構</div><pre>第 3 層（稀疏）：少數節點，長程連線 → 快速定位大概區域
+第 2 層：       節點變多
+第 1 層（密集）：所有節點，短程連線 → 精細搜尋</pre></div>
+      <p>查詢策略：從稀疏層進入 → 逐層下降 → 在密集層精細搜尋。類比：在台灣找人，不逐戶敲門，而是先縮到縣市 → 區 → 街 → 再逐戶找。</p>
+      <p>複雜度從 O(N) 降到接近 <strong>O(log N)</strong>，資料量十倍，搜尋時間只多一點點。</p>
+
+      <div class="callout callout-info">
+        <div class="callout-label">近似最近鄰（ANN）</div>
+        HNSW 是<strong>近似</strong>搜尋，理論上可能找不到數學意義上絕對最近的那幾個，但準確率通常 &gt; 95%。語意搜尋本身就不需要「數學上絕對最近」，「夠近、夠相關」就夠了。
+      </div>
+    </div>
+
+    <div class="subsection" id="ret-distance">
+      <h3>距離轉相似度換算</h3>
+      <p>ChromaDB 回傳的是<strong>距離（distance）</strong>，程式碼在 <code>retrieval.py:42</code> 轉換：</p>
+      <div class="code-block"><div class="code-lang">Python</div><pre>similarity = <span class="num">1</span> - distance</pre></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>similarity 範圍</th><th>意義</th></tr></thead>
+        <tbody>
+          <tr><td>接近 1</td><td>非常相似</td></tr>
+          <tr><td>接近 0</td><td>不相關</td></tr>
+          <tr><td>負數</td><td>語意相反</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- ══ SECTION 3: GENERATOR ══ -->
+  <section class="section" id="generator">
+    <div class="section-header">
+      <span class="stage-badge b-gen">Generator</span>
+      <h2>Prompt 組合與生成回答</h2>
+    </div>
+
+    <p>Generator 接收 Retrieval 的結果，負責「組合 prompt → 呼叫 Claude API → 回傳答案」。組合 prompt 是在 Generator 階段，不是 Retrieval。</p>
+
+    <div class="subsection" id="gen-early">
+      <h3>found=False 的提前返回</h3>
+      <div class="code-block"><div class="code-lang">Python — generator.py:45</div><pre><span class="kw">if not</span> retrieval.found:
+    <span class="kw">return</span> {
+        <span class="str">"answer"</span>: <span class="str">"根據現有文件，我無法回答這個問題。"</span>,
+        <span class="str">"sources"</span>: [],
+        <span class="str">"confidence"</span>: <span class="str">"no_context"</span>,
+    }</pre></div>
+      <p>當 Retrieval 找不到任何超過 0.3 門檻的 chunk 時，<strong>直接回傳固定字串，完全不呼叫 Claude API</strong>。</p>
+      <div class="callout callout-info">
+        <div class="callout-label">設計原因</div>
+        <strong>省錢：</strong>沒有上下文的情況下叫 Claude 回答，只會得到幻覺（hallucination），不如不叫。<br>
+        <strong>準確：</strong>固定拒答字串比 Claude 在沒有依據時亂猜，對使用者更誠實、更可靠。
+      </div>
+    </div>
+
+    <div class="subsection" id="gen-prompt">
+      <h3>Prompt 組合方式</h3>
+      <p>就是<strong>字串拼接</strong>，組成新的字串變數，對應 <code>generator.py:52-53</code>：</p>
+      <div class="code-block"><div class="code-lang">Python — generator.py</div><pre>context_text = <span class="fn">_build_context_text</span>(retrieval.chunks)
+<span class="cmt"># → "第 1 段：退貨須在購買後 7 天內...\n第 2 段：..."</span>
+
+user_message = <span class="fn">f</span><span class="str">"【參考文件】\n{context_text}\n\n【使用者問題】\n{query}"</span></pre></div>
+
+      <h4>最終 user_message 的實際內容</h4>
+      <div class="code-block"><div class="code-lang">PROMPT 實際樣貌</div><pre>【參考文件】
+第 1 段：退貨須在購買後 7 天內提出申請...
+第 2 段：退款將於確認後 5~7 個工作天內...
+
+【使用者問題】
+我買錯了，可以退貨嗎？</pre></div>
+
+      <div class="callout callout-info">
+        <div class="callout-label">重點</div>
+        傳給 Claude API 時，<code>system</code> 和 <code>user_message</code> 是<strong>分開的兩個欄位</strong>，不是拼在同一個字串裡。
+      </div>
+      <div class="code-block"><div class="code-lang">Python — API 呼叫結構</div><pre>client.messages.<span class="fn">create</span>(
+    model=settings.claude_model,
+    max_tokens=<span class="num">1024</span>,
+    system=SYSTEM_PROMPT,        <span class="cmt"># 獨立欄位：規則說明</span>
+    messages=[{<span class="str">"role"</span>: <span class="str">"user"</span>, <span class="str">"content"</span>: user_message}],
+)</pre></div>
+
+      <h4>System Prompt 完整內容</h4>
+      <div class="code-block"><div class="code-lang">SYSTEM PROMPT</div><pre>你是一個專業的客服助理。
+你只能根據下方【參考文件】的內容來回答使用者的問題。
+
+規則：
+1. 只使用【參考文件】中提供的資訊作答
+2. 如果文件內容不足以回答問題，請明確回覆：「根據現有文件，我無法回答這個問題。」
+3. 絕對不可以自行推測、補充或使用文件以外的知識
+4. 回答時請引用文件內容，讓使用者知道答案的依據</pre></div>
+    </div>
+
+    <div class="subsection" id="gen-model">
+      <h3>餵給什麼模型</h3>
+      <p>設定在 <code>config.py:13</code>：<code>claude-haiku-4-5-20251001</code>（Claude Haiku 4.5）</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>模型</th><th>速度</th><th>費用</th><th>適合場景</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Haiku（本專案）</strong></td><td>最快</td><td>最低</td><td>大量呼叫、問答、分類、簡單推理</td></tr>
+          <tr><td>Sonnet</td><td>中等</td><td>中等</td><td>複雜分析、程式碼生成、長文摘要</td></tr>
+          <tr><td>Opus</td><td>最慢</td><td>最高</td><td>需要最強推理能力的複雜任務</td></tr>
+        </tbody>
+      </table></div>
+      <p>客服問答不需要創意或複雜推理，只需要忠實依照文件回答，Haiku 的速度和成本優勢最適合這個場景。</p>
+    </div>
+
+    <div class="subsection" id="gen-confidence">
+      <h3>Confidence 三級機制</h3>
+      <div class="code-block"><div class="code-lang">Python — generator.py:27</div><pre><span class="kw">def</span> <span class="fn">_build_confidence</span>(top_score: <span class="fn">float</span>) -> <span class="fn">str</span>:
+    <span class="kw">if</span> top_score >= <span class="num">0.7</span>:   <span class="kw">return</span> <span class="str">"high"</span>
+    <span class="kw">if</span> top_score >= <span class="num">0.3</span>:   <span class="kw">return</span> <span class="str">"low"</span>
+    <span class="kw">return</span> <span class="str">"no_context"</span></pre></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>confidence</th><th>top_score 範圍</th><th>前端顯示</th></tr></thead>
+        <tbody>
+          <tr><td><code>high</code></td><td>&ge; 0.7</td><td>🟢 高信心</td></tr>
+          <tr><td><code>low</code></td><td>0.3 ~ 0.7</td><td>🟡 低信心（建議人工確認）</td></tr>
+          <tr><td><code>no_context</code></td><td>&lt; 0.3</td><td>🔴 知識庫無相關資料（直接拒答，不呼叫 Claude）</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="subsection" id="gen-temp">
+      <h3>Temperature 與 Top_p 參數</h3>
+      <div class="callout callout-warn">
+        <div class="callout-label">本專案的問題</div>
+        目前呼叫 Claude 時沒有設定 temperature，使用預設值（= 1）。對客服 QA 場景來說太高，可能導致同一個問題問兩次得到不同回答。
+      </div>
+
+      <h4>什麼是 Temperature</h4>
+      <p>控制模型「有多隨機」。模型在生成每個字之前，會對所有可能的下一個字算出機率分佈，temperature 決定這個分佈有多平：</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Temperature</th><th>效果</th></tr></thead>
+        <tbody>
+          <tr><td>接近 0</td><td>幾乎每次都選機率最高的字，輸出非常穩定、可預測</td></tr>
+          <tr><td>1（預設）</td><td>按照原始機率選，有適度的多樣性</td></tr>
+          <tr><td>接近 2</td><td>機率分佈被拉平，更隨機、更有創意，但也更容易亂</td></tr>
+        </tbody>
+      </table></div>
+
+      <h4>什麼是 Top_p</h4>
+      <p>另一種控制隨機的方式：只從<strong>累積機率達到 p 的那些字</strong>裡面選，其他直接排除。<br>通常只調 temperature 或 top_p 其中一個，同時調會讓效果難以預測。</p>
+
+      <h4>不同場景的建議</h4>
+      <div class="table-wrap"><table>
+        <thead><tr><th>場景</th><th>建議值</th></tr></thead>
+        <tbody>
+          <tr><td>客服 QA（本專案）</td><td>0 ~ 0.1</td></tr>
+          <tr><td>文件摘要</td><td>0 ~ 0.3</td></tr>
+          <tr><td>程式碼生成</td><td>0 ~ 0.2</td></tr>
+          <tr><td>行銷文案</td><td>0.7 ~ 1</td></tr>
+          <tr><td>故事創作</td><td>1 ~ 1.5</td></tr>
+        </tbody>
+      </table></div>
+
+      <h4>建議修改</h4>
+      <div class="code-block"><div class="code-lang">Python — generator.py（建議加入）</div><pre>client.messages.<span class="fn">create</span>(
+    model=settings.claude_model,
+    max_tokens=<span class="num">1024</span>,
+    temperature=<span class="num">0.1</span>,   <span class="cmt"># 加這行，讓回答更穩定一致</span>
+    system=SYSTEM_PROMPT,
+    messages=[{<span class="str">"role"</span>: <span class="str">"user"</span>, <span class="str">"content"</span>: user_message}],
+)</pre></div>
+    </div>
+  </section>
+
+  <!-- ══ SECTION 4: API ══ -->
+  <section class="section" id="api">
+    <div class="section-header">
+      <span class="stage-badge b-api">API 溝通</span>
+      <h2>前後端架構與 API 設計</h2>
+    </div>
+
+    <p>前端（Streamlit, port 8501）和後端（FastAPI, port 8000）是<strong>兩個獨立的 Python 進程</strong>，透過 HTTP 請求溝通。前端完全不知道 ChromaDB 或 Claude 的存在，所有細節封裝在後端。</p>
+
+    <div class="subsection" id="api-diagram">
+      <h3>互動式系統架構圖</h3>
+      <div class="system-wrap">
+        <div class="diagram-hint">點擊左側前端操作，查看請求路徑高亮 ↓</div>
+        <div class="system-grid">
+          <!-- Frontend -->
+          <div class="sys-panel">
+            <div class="sys-ph ph-fe">Streamlit 前端<br><small style="font-weight:400;opacity:.7">port 8501</small></div>
+            <div class="sys-ops">
+              <button class="sys-op" onclick="selectOp('upload')" id="op-upload">📤 上傳文件</button>
+              <button class="sys-op" onclick="selectOp('list')" id="op-list">📋 列出文件</button>
+              <button class="sys-op" onclick="selectOp('delete')" id="op-delete">🗑 刪除文件</button>
+              <button class="sys-op" onclick="selectOp('chat')" id="op-chat">💬 使用者發問</button>
+            </div>
+          </div>
+          <!-- Backend -->
+          <div class="sys-panel">
+            <div class="sys-ph ph-be">FastAPI 後端<br><small style="font-weight:400;opacity:.7">port 8000</small></div>
+            <div class="sys-be-inner">
+              <div class="be-node" id="bn-doc-router">documents router</div>
+              <div class="be-node" id="bn-chat-router">chat router</div>
+              <div class="be-node" id="bn-ingest">ingest_document()</div>
+              <div class="be-node" id="bn-list-docs">list_documents()</div>
+              <div class="be-node" id="bn-delete-doc">delete_document()</div>
+              <div class="be-node" id="bn-retrieve">retrieve()</div>
+              <div class="be-node" id="bn-generate">generate()</div>
+            </div>
+          </div>
+          <!-- Services -->
+          <div class="sys-panel">
+            <div class="sys-ph ph-sv">外部服務</div>
+            <div class="sv-inner">
+              <div class="sv-node" id="sn-chroma">ChromaDB<br><small style="opacity:.7">local file</small></div>
+              <div class="sv-node" id="sn-claude">Claude API<br><small style="opacity:.7">Haiku 4.5</small></div>
+            </div>
+          </div>
+        </div>
+        <div class="sys-info" id="sys-info">← 點擊左側的操作按鈕，查看請求路徑說明</div>
+      </div>
+    </div>
+
+    <div class="subsection" id="api-upload">
+      <h3>POST /api/documents/upload — 上傳文件</h3>
+      <p>觸發：完整 Ingestion 流程</p>
+      <div class="code-block"><div class="code-lang">Python — streamlit_app.py（前端呼叫）</div><pre>requests.<span class="fn">post</span>(
+    <span class="str">"http://localhost:8000/api/documents/upload"</span>,
+    files={<span class="str">"file"</span>: (file.name, file.<span class="fn">getvalue</span>(), file.type)},
+    timeout=<span class="num">60</span>,
+)</pre></div>
+      <p>傳輸格式：<code>multipart/form-data</code>（二進位檔案上傳的標準格式）</p>
+      <p><strong>後端做什麼：</strong>① 檢查副檔名（只接受 .pdf/.txt/.md）→ ② 存實體檔案到 data/documents/ → ③ 呼叫 ingest_document()（chunking → embedding → 寫入 ChromaDB）</p>
+      <p><strong>回傳：</strong> <code>{"filename": "退貨政策.pdf", "chunks": 12}</code></p>
+    </div>
+
+    <div class="subsection" id="api-list">
+      <h3>GET /api/documents/ — 列出文件</h3>
+      <div class="code-block"><div class="code-lang">Python — streamlit_app.py（前端呼叫）</div><pre>requests.<span class="fn">get</span>(<span class="str">"http://localhost:8000/api/documents/"</span>, timeout=<span class="num">10</span>)</pre></div>
+      <p><strong>後端做什麼：</strong>去 ChromaDB 撈所有 metadata，取出不重複的 <code>source</code> 欄位清單</p>
+      <p><strong>回傳：</strong> <code>{"documents": ["付款方式說明.pdf", "退貨政策說明.txt"]}</code></p>
+    </div>
+
+    <div class="subsection" id="api-delete">
+      <h3>DELETE /api/documents/{filename} — 刪除文件</h3>
+      <div class="code-block"><div class="code-lang">Python — streamlit_app.py（前端呼叫）</div><pre>requests.<span class="fn">delete</span>(<span class="str">f"http://localhost:8000/api/documents/{filename}"</span>, timeout=<span class="num">10</span>)</pre></div>
+      <p><strong>後端做什麼：</strong>① 刪掉 data/documents/ 裡的實體檔案 → ② 把 ChromaDB 裡這個檔案的所有 chunk 一併刪除</p>
+      <p><strong>回傳：</strong> <code>{"message": "退貨政策說明.pdf 已從知識庫移除"}</code></p>
+    </div>
+
+    <div class="subsection" id="api-chat">
+      <h3>POST /api/chat/ — 使用者發問</h3>
+      <p>觸發：Retrieval + Generator 全流程</p>
+      <div class="code-block"><div class="code-lang">Python — streamlit_app.py（前端呼叫）</div><pre>requests.<span class="fn">post</span>(
+    <span class="str">"http://localhost:8000/api/chat/"</span>,
+    json={<span class="str">"message"</span>: <span class="str">"我可以退貨嗎？"</span>},
+    timeout=<span class="num">120</span>,
+)</pre></div>
+      <div class="code-block"><div class="code-lang">Python — chat.py（後端，核心就兩行）</div><pre><span class="kw">def</span> <span class="fn">chat</span>(body: ChatRequest):
+    retrieval = <span class="fn">retrieve</span>(body.message)          <span class="cmt"># Retrieval 階段</span>
+    result = <span class="fn">generate</span>(body.message, retrieval)   <span class="cmt"># Generator 階段</span>
+    <span class="kw">return</span> result</pre></div>
+      <p><strong>回傳：</strong></p>
+      <div class="code-block"><div class="code-lang">JSON</div><pre>{
+  <span class="str">"answer"</span>: <span class="str">"根據退貨政策，您需在購買後 7 天內提出申請..."</span>,
+  <span class="str">"sources"</span>: [<span class="str">"退貨政策說明.txt"</span>],
+  <span class="str">"confidence"</span>: <span class="str">"high"</span>
+}</pre></div>
+
+      <h4>API 設計對照表</h4>
+      <div class="table-wrap"><table>
+        <thead><tr><th>API</th><th>Method</th><th>觸發階段</th><th>傳入格式</th></tr></thead>
+        <tbody>
+          <tr><td>/api/documents/upload</td><td>POST</td><td>完整 Ingestion</td><td>multipart/form-data</td></tr>
+          <tr><td>/api/documents/</td><td>GET</td><td>讀取 ChromaDB metadata</td><td>無 body</td></tr>
+          <tr><td>/api/documents/{filename}</td><td>DELETE</td><td>刪除檔案 + chunk</td><td>filename 在 URL</td></tr>
+          <tr><td>/api/chat/</td><td>POST</td><td>Retrieval + Generator</td><td>JSON {"message": "..."}</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+  </section>
+
+</div>
+</main>
+
+<script>
+// ── Theme ──────────────────────────────────────────
+function toggleTheme() {
+  const r = document.documentElement;
+  const cur = r.getAttribute('data-theme');
+  r.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+}
+
+// ── Sidebar mobile ─────────────────────────────────
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('overlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('show');
+}
+
+// Close sidebar on nav link click (mobile)
+document.querySelectorAll('.nav-link').forEach(a => {
+  a.addEventListener('click', () => {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('overlay').classList.remove('show');
+  });
+});
+
+// ── Active nav via IntersectionObserver ────────────
+const sections = document.querySelectorAll('[id]');
+const navLinks = document.querySelectorAll('.nav-link');
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navLinks.forEach(l => l.classList.remove('active'));
+      const match = document.querySelector(`.nav-link[href="#${e.target.id}"]`);
+      if (match) match.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+sections.forEach(s => io.observe(s));
+
+// ── Pipeline Diagram A ─────────────────────────────
+let activeStage = null;
+function togglePipeline(stage) {
+  const stages = ['ing', 'ret', 'gen'];
+  if (activeStage === stage) {
+    // close
+    document.getElementById('pn-' + stage).className = 'p-node';
+    document.getElementById('pe-' + stage).classList.remove('show');
+    activeStage = null;
+  } else {
+    // close previous
+    if (activeStage) {
+      document.getElementById('pn-' + activeStage).className = 'p-node';
+      document.getElementById('pe-' + activeStage).classList.remove('show');
+    }
+    // open new
+    document.getElementById('pn-' + stage).className = 'p-node on-' + stage;
+    document.getElementById('pe-' + stage).classList.add('show');
+    activeStage = stage;
+  }
+}
+
+// ── API System Diagram B ────────────────────────────
+const opPaths = {
+  upload: {
+    be: { 'bn-doc-router': 'ing', 'bn-ingest': 'ing' },
+    sv: { 'sn-chroma': 'chroma' },
+    info: '<strong>POST /api/documents/upload</strong><br>Streamlit 傳檔案（multipart） → documents router → ingest_document()（chunking + embedding） → 寫入 ChromaDB。回傳 {filename, chunks}。'
+  },
+  list: {
+    be: { 'bn-doc-router': 'ing', 'bn-list-docs': 'api' },
+    sv: { 'sn-chroma': 'chroma' },
+    info: '<strong>GET /api/documents/</strong><br>Streamlit 發 GET → documents router → list_documents() → 讀 ChromaDB metadata。回傳不重複的 source 清單。'
+  },
+  delete: {
+    be: { 'bn-doc-router': 'ing', 'bn-delete-doc': 'api' },
+    sv: { 'sn-chroma': 'chroma' },
+    info: '<strong>DELETE /api/documents/{filename}</strong><br>Streamlit 發 DELETE → documents router → delete_document() → 刪除實體檔案 + ChromaDB 內所有對應 chunk。'
+  },
+  chat: {
+    be: { 'bn-chat-router': 'ret', 'bn-retrieve': 'ret', 'bn-generate': 'gen' },
+    sv: { 'sn-chroma': 'chroma', 'sn-claude': 'claude' },
+    info: '<strong>POST /api/chat/</strong><br>Streamlit 傳 JSON → chat router → retrieve()（embed 問題 → HNSW 查詢 ChromaDB → 過濾 0.3） → generate()（組 prompt → Claude Haiku API）。回傳 {answer, sources, confidence}。'
+  }
+};
+
+let selOp = null;
+function selectOp(op) {
+  // Reset all
+  document.querySelectorAll('.be-node').forEach(n => n.className = 'be-node');
+  document.querySelectorAll('.sv-node').forEach(n => n.className = 'sv-node');
+  document.querySelectorAll('.sys-op').forEach(b => b.classList.remove('sel'));
+
+  if (selOp === op) { selOp = null; document.getElementById('sys-info').className = 'sys-info'; document.getElementById('sys-info').innerHTML = '← 點擊左側的操作按鈕，查看請求路徑說明'; return; }
+
+  selOp = op;
+  document.getElementById('op-' + op).classList.add('sel');
+  const path = opPaths[op];
+  Object.entries(path.be).forEach(([id, cls]) => {
+    document.getElementById(id).classList.add('lit-' + cls);
+  });
+  Object.entries(path.sv).forEach(([id, cls]) => {
+    document.getElementById(id).classList.add('lit-' + cls);
+  });
+  const info = document.getElementById('sys-info');
+  info.className = 'sys-info show';
+  info.innerHTML = path.info;
+}
+</script>
