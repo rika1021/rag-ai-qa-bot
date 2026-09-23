@@ -21,6 +21,65 @@ ValueError: Model paraphrase-multilingual-MiniLM-L12-v2 is not supported in Text
 
 ---
 
+## [2026-09-23] Phase 3 CI 第二次失敗：ModuleNotFoundError: No module named 'dotenv'
+
+### 錯誤情境
+
+修完 ruff 的 12 個 lint 錯誤後再次 push，CI 這次過了 `Lint (ruff)` step，
+但在 `Run tests` step 又失敗了。
+
+### 如何從 log 判斷問題
+
+用 `gh run view <run-id> --log-failed` 看失敗的詳細 log，
+讀 log 的方法：**從最底下的 `E` 或 `Error:` 行開始往上看**。
+
+```
+tests/conftest.py:3: in <module>       ← 錯誤發生的位置（conftest.py 第 3 行）
+    from dotenv import load_dotenv     ← 觸發錯誤的那行程式碼
+E   ModuleNotFoundError: No module named 'dotenv'  ← 錯誤是什麼
+```
+
+兩個資訊定位問題：
+1. **錯誤是什麼**：`ModuleNotFoundError` = Python 找不到這個模組，代表套件沒被安裝
+2. **在哪觸發**：`conftest.py:3` 在 `from dotenv import load_dotenv`
+
+### 問題原因
+
+CI 的安裝步驟只有：
+```yaml
+- run: pip install -r requirements-eval.txt
+```
+
+`python-dotenv` 存在於 `requirements.txt`（給 app 用），但不在 `requirements-eval.txt`（給 CI 測試用）。
+`conftest.py` 需要 `dotenv` 載入 `.env`，所以 CI 環境中找不到這個套件。
+
+### 解法
+
+在 `requirements-eval.txt` 加入：
+```
+python-dotenv>=1.0.0
+```
+
+### 為什麼 Docker 不需要重 build？
+
+`requirements-eval.txt` 只有 CI 在用，Docker 用的是 `requirements.txt`，
+`Dockerfile` 裡只有 `COPY requirements.txt .` 和 `RUN pip install -r requirements.txt`，
+兩者完全獨立，改 eval 的依賴不影響 image。
+
+### 修改的檔案
+
+- `requirements-eval.txt` — 加入 `python-dotenv>=1.0.0`
+
+### 最終結果
+
+第三次 push 後，CI 全部通過：
+
+```
+✓  add python-dotenv to requirements-eval.txt  CI  dev  push  1m53s
+```
+
+---
+
 ## [2026-09-23] Phase 2 驗收完成
 
 ### 驗收結果
