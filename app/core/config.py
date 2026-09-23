@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     data_dir: Path = base_dir / "data" / "documents"
     chroma_dir: Path = base_dir / "chroma_db"
 
-    embedding_model: str = "paraphrase-multilingual-MiniLM-L12-v2"
+    embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     claude_model: str = "claude-haiku-4-5-20251001"
 
     chunk_size: int = 500

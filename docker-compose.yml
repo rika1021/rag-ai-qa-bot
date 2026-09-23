@@ -1,0 +1,23 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - chroma_data:/app/chroma_db
+
+  streamlit:
+    build: .
+    command: streamlit run streamlit_app.py --server.port 8501
+    ports:
+      - "8501:8501"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - API_BASE_URL=http://api:8000
+    depends_on:
+      - api
+
+volumes:
+  chroma_data:
