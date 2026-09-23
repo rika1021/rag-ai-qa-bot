@@ -1,0 +1,9 @@
+exclude = ["venv", "chroma_db", "test.py"]
+line-length = 100
+
+[lint]
+ignore = [
+    "BLE001",  # blind except Exception — 這個專案的錯誤處理刻意用通用 except
+    "DTZ005",  # datetime.now() without tz — eval 腳本不需要 timezone-aware
+    "SIM102",  # nested if — 可讀性考量保留原寫法
+]
