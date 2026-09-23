@@ -1,8 +1,8 @@
 # Phase 3：GitHub Actions CI
 
 > 學習計劃對應章節：Phase 3（約 1-2 天）
-> 完成日期：—
-> 狀態：🔄 進行中
+> 完成日期：2026-09-23
+> 狀態：✅ 完成
 
 ---
 
@@ -319,36 +319,110 @@ GitHub Secrets 加密存在 GitHub 伺服器，不進 git，log 裡自動遮罩�
 
 ---
 
-## 六、驗收步驟
+## 六、push 到 dev 和開 PR 的 CI 差異
+
+這次實作跑了兩種觸發，兩者目的不同：
+
+```yaml
+on:
+  push:
+    branches: [main, dev]      # push 到 dev 時觸發
+  pull_request:
+    branches: [main]           # 有 PR 要合進 main 時觸發
+```
+
+| | push 到 dev | 開 PR（dev → main） |
+|--|------------|-------------------|
+| 觸發原因 | 你直接 push commit | 你提出合併請求 |
+| 目的 | 確認「這個 commit 本身沒問題」 | 確認「合併進 main 之後不會壞」 |
+| 結果顯示在 | Actions tab 的 commit 記錄 | PR 頁面的 checks 區塊 |
+
+**為什麼要跑兩次？**
+
+`push` 是快速回饋，確認你自己的 code 沒問題。
+`pull_request` 是保護 main——即使每個 commit 個別都過，
+兩個人同時改不同 branch 合在一起可能炸掉，PR 的 CI 就是防這種情況。
+
+---
+
+## 七、PR 開下去到 CI 完成的完整流程
+
+```
+gh pr create (dev → main)
+      ↓
+GitHub 偵測到「有人想把 dev 合併進 main」
+      ↓
+ci.yml 的 on: pull_request: branches: [main] 被觸發
+      ↓
+開全新虛擬機器，跑 test job
+  → checkout → setup python → cache pip → pip install → ruff → pytest
+      ↓
+test 通過 → 跑 build job（needs: test）
+  → checkout → docker build
+      ↓
+全部通過 → PR 頁面出現綠色勾勾
+      ↓
+按 Merge → dev 的 commit 合進 main
+```
+
+---
+
+## 八、如何看 CI log 判斷錯誤
 
 ```bash
-# 1. 建立 dev branch
+gh run list --limit 5          # 看最近幾次 run 的狀態
+gh run view <run-id> --log-failed  # 只看失敗的 step 的 log
+```
+
+**讀 log 的方法**：從最底下的 `E` 或 `Error:` 行開始往上看。
+
+```
+tests/conftest.py:3: in <module>       ← 錯誤發生的位置
+    from dotenv import load_dotenv     ← 觸發錯誤的那行程式碼
+E   ModuleNotFoundError: No module named 'dotenv'  ← 錯誤是什麼
+```
+
+兩個資訊足以定位問題：
+1. **錯誤是什麼**（`E` 那行）
+2. **在哪觸發**（上面那行的檔案路徑 + 行號）
+
+---
+
+## 九、驗收步驟與結果
+
+### 實際執行流程
+
+```bash
 git checkout -b dev
-
-# 2. 加入新檔案並 commit
 git add .github/ ruff.toml
-git commit -m "add CI workflow"
-
-# 3. push 到 GitHub
+git commit -m "add GitHub Actions CI workflow"
 git push origin dev
+# → CI 觸發，但失敗（ruff 12 個錯誤）→ 修完再 push
 
-# 4. 到 GitHub 上的 repo → Actions tab，觀察 workflow 執行過程
-# 5. 開 PR（dev → main），確認 PR 頁面出現 CI 檢查
+git add .
+git commit -m "fix ruff lint errors"
+git push origin dev
+# → CI 觸發，但失敗（ModuleNotFoundError: dotenv）→ 加進 requirements-eval.txt 再 push
 
-# 驗收：故意加一個 lint 錯誤，確認 CI 在 ruff step 失敗（紅叉）
-# 例如：在任何 .py 檔加一行多餘的空格或超長的行
+git add requirements-eval.txt
+git commit -m "add python-dotenv to requirements-eval.txt"
+git push origin dev
+# → CI 通過 ✅
+
+gh pr create --title "Phase 3: add CI pipeline" ...
+# → PR CI 通過 ✅ → merge 進 main
 ```
 
 ### 驗收清單
 
-- [ ] push commit 到 `dev` branch，Actions tab 出現正在執行的 workflow
-- [ ] PR 頁面出現 CI 的綠色勾勾（checks passed）
-- [ ] 能在 Actions tab 看懂每個 step 的 log
-- [ ] 故意加 lint 錯誤，確認 CI 在 ruff step 報錯（紅叉）
+- [x] push commit 到 `dev` branch，Actions tab 出現正在執行的 workflow
+- [x] PR 頁面出現 CI 的綠色勾勾（checks passed）
+- [x] 能用 `gh run view --log-failed` 看懂每個 step 的 log 並定位錯誤
+- [x] 實際遭遇 CI 紅燈並修復（ruff 錯誤、dotenv 缺失）
 
 ---
 
-## 七、面試說法
+## 十、面試說法
 
 > 「我用 GitHub Actions 設定了 CI pipeline，每次 push 到 dev branch 或開 PR 進 main，
 > 就會自動跑 ruff lint 和 regression tests。
