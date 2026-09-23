@@ -45,6 +45,71 @@ ValueError: Model paraphrase-multilingual-MiniLM-L12-v2 is not supported in Text
 
 ---
 
+## [2026-09-23] Phase 3 CI 首次觸發：ruff lint 12 個錯誤
+
+### 錯誤情境
+
+push `ci.yml` 到 `dev` branch 後，GitHub Actions 的 `Lint (ruff)` step 失敗，
+找到 12 個錯誤，CI 紅燈，`build` job 因 `needs: test` 沒有跑。
+
+### 錯誤分類與解法
+
+**類型一：Import 順序錯誤（I001）— 5 個檔案**
+
+ruff 要求 import 必須按照這個順序，且群組之間用空行分隔：
+1. stdlib（Python 內建）：`import os`、`from pathlib import Path`
+2. third-party（pip 安裝的）：`import pytest`、`from pydantic_settings import ...`
+
+受影響檔案與修法（全部都是加一個空行分隔）：
+
+| 檔案 | 修法 |
+|------|------|
+| `tests/test_regression.py` | `json`、`pathlib` 與 `pytest` 之間加空行 |
+| `tests/conftest.py` | `pathlib` 與 `dotenv` 之間加空行 |
+| `app/core/config.py` | `pathlib` 與 `pydantic_settings` 之間加空行 |
+| `streamlit_app.py` | `os` 與 `requests`、`streamlit` 之間加空行 |
+
+**類型二：可簡化的 if（PLR1730）— 1 個**
+
+`app/core/rag/retrieval.py` 第 43 行：
+```python
+# 修改前
+if similarity > top_score:
+    top_score = similarity
+
+# 修改後
+top_score = max(top_score, similarity)
+```
+
+**類型三：加 ignore 規則處理（不修改程式碼）— 6 個**
+
+在 `ruff.toml` 加 `[lint] ignore`，以下規則對這個專案不適用：
+
+| 規則 | 說明 | 忽略原因 |
+|------|------|---------|
+| `BLE001` | `except Exception` 過於寬泛 | 這個專案的錯誤處理刻意用通用 except，對使用者顯示錯誤訊息 |
+| `DTZ005` | `datetime.now()` 沒有 timezone | eval 腳本只是記錄本機時間，不需要 timezone-aware |
+| `SIM102` | 巢狀 if 可以合併 | 保留原寫法可讀性較高 |
+
+`test.py` 也加進 `exclude`，因為它是手動驗證腳本，不是正式模組。
+
+### 修改的檔案
+
+- `tests/test_regression.py` — import 排序
+- `tests/conftest.py` — import 排序
+- `app/core/config.py` — import 排序
+- `streamlit_app.py` — import 排序
+- `app/core/rag/retrieval.py` — if 簡化為 max()
+- `ruff.toml` — 加 exclude 和 ignore 規則
+
+### 學到的事
+
+這次 CI 紅燈是個好例子：**CI 在 PR merge 之前就抓到了問題**，
+而且 `build` job 因為 `needs: test` 沒有白跑，節省了 CI 資源。
+這就是 CI pipeline 設計的價值——越早失敗，代價越小。
+
+---
+
 ## 💡 Docker 相關知識點紀錄
 
 ### 1. 執行 Docker 指令不需要進入虛擬環境 (venv)

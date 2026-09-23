@@ -40,8 +40,7 @@ def retrieve(query: str) -> RetrievalResult:
 
     for doc, meta, distance in zip(documents, metadatas, distances):
         similarity = 1 - distance
-        if similarity > top_score:
-            top_score = similarity
+        top_score = max(top_score, similarity)
         if similarity >= settings.similarity_threshold:
             filtered_chunks.append(doc)
             filtered_sources.append(meta["source"])

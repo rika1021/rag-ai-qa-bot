@@ -20,8 +20,9 @@ RAG Regression Test Suite
 """
 
 import json
-import pytest
 from pathlib import Path
+
+import pytest
 
 RESULTS_PATH = Path(__file__).parent.parent / "eval" / "results.json"
 
