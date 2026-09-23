@@ -1,0 +1,2 @@
+exclude = ["venv", "chroma_db"]
+line-length = 100
