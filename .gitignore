@@ -15,3 +15,8 @@ chroma_db/
 .DS_Store
 .vscode/
 .idea/
+
+# Study notes (local only, not part of the app)
+CICD_study/
+CICD_study_note/
+note/
