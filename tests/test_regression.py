@@ -31,8 +31,12 @@ THRESHOLDS = {
     "mrr": 0.60,
     "faithfulness": 0.70,
     # RAGAS answer_relevancy 對繁體中文有系統性低分（LLM judge 生成英文問題再和中文問題比對）
-    # baseline = 58.33%，閾值設 0.50 以偵測退步，而非追求絕對分數
-    "answer_relevancy": 0.50,
+    # baseline = 67.00%（加 reranker 後），閾值設 0.55 以偵測退步
+    "answer_relevancy": 0.55,
+    # Reranker（Stage 2）的指標閾值
+    # baseline: recall@3=100%, mrr=1.0；設低於 baseline 以容許資料集變動
+    "reranker_recall@3": 0.92,
+    "reranker_mrr": 0.85,
 }
 
 
@@ -86,6 +90,40 @@ def test_ragas_faithfulness(eval_results):
     assert score >= threshold, (
         f"Faithfulness = {score:.2%}，低於閾值 {threshold:.0%}。\n"
         f"建議檢查：app/core/rag/generator.py 的 system prompt 是否夠嚴格。"
+    )
+
+
+def test_reranker_recall_at_3(eval_results):
+    """
+    Reranker（Stage 2）的 Recall@3。
+    baseline = 100%，設 0.92 容許資料集小幅變動。
+    若低於此值，代表 reranker 排名退步，正確 chunk 掉出前 3。
+    可能原因：reranker 模型版本變動，或 sentence-transformers 版本不相容。
+    """
+    if "retrieval_reranked" not in eval_results:
+        pytest.skip("找不到 retrieval_reranked。請先執行 `python eval/run_eval.py` 並更新 results.json。")
+    score = eval_results["retrieval_reranked"]["recall@3"]
+    threshold = THRESHOLDS["reranker_recall@3"]
+    assert score >= threshold, (
+        f"Reranker Recall@3 = {score:.2%}，低於閾值 {threshold:.0%}。\n"
+        f"Stage 1 向量搜尋正常但 Stage 2 退步，代表 reranker 排名出問題。\n"
+        f"建議檢查：sentence-transformers 版本或 app/core/config.py 的 reranker_model。"
+    )
+
+
+def test_reranker_mrr(eval_results):
+    """
+    Reranker（Stage 2）的 MRR。
+    baseline = 1.0，設 0.85 容許資料集小幅變動。
+    若 Stage 1 MRR 正常但此值退步，代表 reranker 重排方向錯誤。
+    """
+    if "retrieval_reranked" not in eval_results:
+        pytest.skip("找不到 retrieval_reranked。請先執行 `python eval/run_eval.py` 並更新 results.json。")
+    score = eval_results["retrieval_reranked"]["mrr"]
+    threshold = THRESHOLDS["reranker_mrr"]
+    assert score >= threshold, (
+        f"Reranker MRR = {score:.4f}，低於閾值 {threshold}。\n"
+        f"正確 chunk 有被撈到但 reranker 排名不夠前面。"
     )
 
 

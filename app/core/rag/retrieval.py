@@ -1,4 +1,7 @@
 from dataclasses import dataclass, field
+from functools import lru_cache
+
+from sentence_transformers import CrossEncoder
 
 from app.core.config import settings
 from app.core.vectorstore import embed, get_collection
@@ -12,10 +15,16 @@ class RetrievalResult:
     top_score: float = 0.0
 
 
+@lru_cache(maxsize=1)
+def _get_reranker() -> CrossEncoder:
+    return CrossEncoder(settings.reranker_model)
+
+
 def retrieve(query: str) -> RetrievalResult:
     """
-    把問題轉成向量，去 ChromaDB 找相關 chunk。
-    每筆個別判斷相似度，只保留 >= 閾值的 chunk。
+    Two-stage retrieval:
+    Stage 1 — ChromaDB 向量搜尋取 top_k 候選（召回率優先）
+    Stage 2 — Cross-encoder reranker 重新評分，取 reranker_top_k（精準度優先）
     """
     collection = get_collection()
 
@@ -34,19 +43,33 @@ def retrieve(query: str) -> RetrievalResult:
     metadatas = results["metadatas"][0]
     distances = results["distances"][0]
 
-    filtered_chunks: list[str] = []
-    filtered_sources: list[str] = []
-    top_score: float = 0.0
-
+    # Stage 1 過濾：移除相似度太低的 chunk
+    candidates: list[tuple[str, str, float]] = []
     for doc, meta, distance in zip(documents, metadatas, distances):
         similarity = 1 - distance
-        top_score = max(top_score, similarity)
         if similarity >= settings.similarity_threshold:
-            filtered_chunks.append(doc)
-            filtered_sources.append(meta["source"])
+            candidates.append((doc, meta["source"], similarity))
 
-    if not filtered_chunks:
+    if not candidates:
+        top_score = max((1 - d for d in distances), default=0.0)
         return RetrievalResult(found=False, top_score=top_score)
+
+    # Stage 2 rerank：cross-encoder 對每個候選重新評分
+    reranker = _get_reranker()
+    pairs = [[query, doc] for doc, _, _ in candidates]
+    rerank_scores = reranker.predict(pairs)
+
+    ranked = sorted(
+        zip(rerank_scores, candidates),
+        key=lambda x: x[0],
+        reverse=True,
+    )
+
+    top_chunks = ranked[: settings.reranker_top_k]
+    top_score = float(ranked[0][1][2])  # 原始向量相似度中最高的
+
+    filtered_chunks = [doc for _, (doc, _, _) in top_chunks]
+    filtered_sources = [src for _, (_, src, _) in top_chunks]
 
     # 去除重複來源，但保持順序
     seen: set[str] = set()

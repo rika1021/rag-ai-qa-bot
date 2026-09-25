@@ -17,6 +17,8 @@ chroma_db/
 .idea/
 
 # Study notes (local only, not part of the app)
-CICD_study/
 CICD_study_note/
 note/
+
+# Local testing config
+docker-compose.ghcr.yml
