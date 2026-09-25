@@ -15,8 +15,11 @@ class Settings(BaseSettings):
 
     chunk_size: int = 500
     chunk_overlap: int = 50
-    retrieval_top_k: int = 5
+    retrieval_top_k: int = 20
     similarity_threshold: float = 0.30
+
+    reranker_model: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+    reranker_top_k: int = 3
 
     class Config:
         env_file = ".env"
