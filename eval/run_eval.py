@@ -34,6 +34,7 @@ from app.core.config import settings
 from app.core.rag.generator import generate
 from app.core.rag.retrieval import retrieve
 from eval.answer_eval import eval_answers
+from eval.hash_utils import compute_code_hash
 from eval.retrieval_eval import eval_retrieval, eval_retrieval_with_reranker
 
 EVAL_DIR = Path(__file__).parent
@@ -88,6 +89,7 @@ def main():
 
     # 儲存報告
     report = {
+        "code_hash": compute_code_hash(),
         "timestamp": datetime.now().isoformat(),
         "test_cases_count": len(test_cases),
         "retrieval": retrieval_scores,

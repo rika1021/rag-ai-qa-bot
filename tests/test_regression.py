@@ -19,12 +19,7 @@ RAG Regression Test Suite
 若有指標低於閾值，代表你的改動讓品質退步了。
 """
 
-import json
-from pathlib import Path
-
 import pytest
-
-RESULTS_PATH = Path(__file__).parent.parent / "eval" / "results.json"
 
 THRESHOLDS = {
     "recall@3": 0.70,
@@ -38,16 +33,6 @@ THRESHOLDS = {
     "reranker_recall@3": 0.92,
     "reranker_mrr": 0.85,
 }
-
-
-@pytest.fixture(scope="session")
-def eval_results():
-    if not RESULTS_PATH.exists():
-        pytest.skip(
-            "找不到 eval/results.json。"
-            "請先執行 `python eval/run_eval.py` 產生評估結果。"
-        )
-    return json.loads(RESULTS_PATH.read_text(encoding="utf-8"))
 
 
 def test_retrieval_recall_at_3(eval_results):
